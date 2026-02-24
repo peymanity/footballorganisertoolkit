@@ -37,16 +37,47 @@ def cli():
 @click.option(
     "--password", prompt="Spond password", hide_input=True, help="Your Spond password"
 )
-@click.option("--group-id", default=None, help="Default group ID for events")
-def config(username, password, group_id):
+def config(username, password):
     """Configure Spond credentials and default group."""
     cfg = load_config()
     cfg["spond_username"] = username
     cfg["spond_password"] = password
-    if group_id:
-        cfg["group_id"] = group_id
     save_config(cfg)
-    click.echo("Configuration saved.")
+    click.echo("Credentials saved. Fetching your groups...")
+
+    async def _pick_group():
+        client = await get_client(username, password)
+        try:
+            grps = await list_groups(client)
+        finally:
+            await client.clientsession.close()
+        return grps
+
+    grps = _run(_pick_group())
+
+    if not grps:
+        click.echo("No groups found. You can set a group ID later with: fot config")
+        return
+
+    click.echo("")
+    for i, g in enumerate(grps, 1):
+        member_count = len(g.get("members", []))
+        click.echo(f"  {i}. {g['name']} ({member_count} members)")
+
+    if len(grps) == 1:
+        choice = 1
+        click.echo(f"\nOnly one group found, selecting: {grps[0]['name']}")
+    else:
+        choice = click.prompt(
+            "\nSelect default group",
+            type=click.IntRange(1, len(grps)),
+        )
+
+    selected = grps[choice - 1]
+    cfg["group_id"] = selected["id"]
+    cfg["group_name"] = selected["name"]
+    save_config(cfg)
+    click.echo(f"Default group set to: {selected['name']}")
 
 
 @cli.command()
