@@ -167,8 +167,9 @@ def events(group_id, upcoming, max_events):
 @click.option("--meetup-prior", default=30, help="Meetup time before kick-off in minutes (default: 30)")
 @click.option("--group-id", default=None, help="Group ID (uses default if not set)")
 @click.option("--subgroup-id", default=None, help="Subgroup ID")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
 @click.option("--dry-run", is_flag=True, help="Show what would be created without creating")
-def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, group_id, subgroup_id, dry_run):
+def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, group_id, subgroup_id, yes, dry_run):
     """Create an availability request in Spond."""
     gid = group_id or get_group_id()
 
@@ -199,7 +200,7 @@ def create_cmd(heading, date, start_time, duration, description, location, meetu
         click.echo("\n  [DRY RUN] Event not created.")
         return
 
-    if not click.confirm("\n  Create this event?"):
+    if not yes and not click.confirm("\n  Create this event?"):
         click.echo("  Cancelled.")
         return
 
