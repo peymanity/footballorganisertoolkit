@@ -164,11 +164,12 @@ def events(group_id, upcoming, max_events):
 )
 @click.option("--description", default="", help="Event description")
 @click.option("--location", default=None, help="Venue / location")
+@click.option("--meetup-prior", default=30, help="Meetup time before kick-off in minutes (default: 30)")
 @click.option("--group-id", default=None, help="Group ID (uses default if not set)")
 @click.option("--subgroup-id", default=None, help="Subgroup ID")
 @click.option("--dry-run", is_flag=True, help="Show what would be created without creating")
-def create_cmd(heading, date, start_time, duration, description, location, group_id, subgroup_id, dry_run):
-    """Create an availability event in Spond."""
+def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, group_id, subgroup_id, dry_run):
+    """Create an availability request in Spond."""
     gid = group_id or get_group_id()
 
     # Parse time
@@ -179,10 +180,12 @@ def create_cmd(heading, date, start_time, duration, description, location, group
 
     start = date.replace(hour=hour, minute=minute)
     end = start + timedelta(minutes=duration)
+    meetup = start - timedelta(minutes=meetup_prior)
 
     click.echo(f"\n  Event:    {heading}")
     click.echo(f"  Date:     {start.strftime('%a %d %b %Y')}")
-    click.echo(f"  Time:     {start.strftime('%H:%M')} - {end.strftime('%H:%M')}")
+    click.echo(f"  Meetup:   {meetup.strftime('%H:%M')}")
+    click.echo(f"  Kick-off: {start.strftime('%H:%M')} - {end.strftime('%H:%M')}")
     click.echo(f"  Duration: {duration} min")
     if location:
         click.echo(f"  Location: {location}")
@@ -212,6 +215,7 @@ def create_cmd(heading, date, start_time, duration, description, location, group
                 end=end,
                 description=description,
                 location=location,
+                meetup_prior=meetup_prior,
                 subgroup_id=subgroup_id,
             )
             click.echo(f"\n  Event created! ID: {result.get('id', '?')}")

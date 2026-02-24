@@ -3,22 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from spond.spond import Spond
-
-
-async def _run(coro):
-    """Run a coroutine and clean up the client session."""
-    return await coro
-
-
-def run_async(func):
-    """Decorator to run an async function synchronously."""
-    def wrapper(*args, **kwargs):
-        return asyncio.run(func(*args, **kwargs))
-    return wrapper
 
 
 async def get_client(username: str, password: str) -> Spond:
@@ -54,48 +42,55 @@ async def create_event(
     end: datetime,
     description: str = "",
     location: str | None = None,
+    meetup_prior: int = 30,
     subgroup_id: str | None = None,
-    invite_all: bool = True,
 ) -> dict[str, Any]:
-    """Create a new event (availability request) in Spond.
+    """Create a new availability request in Spond.
 
+    Based on the structure of real events from the Harpenden Colts group.
     The spond package doesn't expose a create method, so we call the API
     directly using the authenticated session.
     """
-    # Ensure client is authenticated
     if not client.token:
         await client.login()
 
     url = f"{client.api_url}sponds/"
 
+    meetup = start - timedelta(minutes=meetup_prior)
+
     event_data: dict[str, Any] = {
         "heading": heading,
         "description": description,
-        "spondType": "EVENT",
         "startTimestamp": start.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         "endTimestamp": end.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "meetupTimestamp": meetup.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "meetupPrior": meetup_prior,
         "commentsDisabled": False,
         "maxAccepted": 0,
         "rsvpDate": None,
-        "location": {
-            "id": None,
-            "feature": location,
-            "address": location,
-            "latitude": None,
-            "longitude": None,
-        },
         "visibility": "INVITEES",
         "participantsHidden": False,
         "autoReminderType": "DISABLED",
         "autoAccept": False,
+        "hidden": False,
         "payment": {},
         "attachments": [],
         "tasks": {"openTasks": [], "assignedTasks": []},
-        "type": "EVENT",
+        "type": "AVAILABILITY",
+        "matchEvent": False,
     }
 
-    # Attach to the group
-    recipients: dict[str, Any] = {"group": {"id": group_id}}
+    if location:
+        event_data["location"] = {
+            "feature": location,
+            "address": location,
+        }
+
+    recipients: dict[str, Any] = {
+        "group": {"id": group_id},
+        "profiles": [],
+        "guardians": [],
+    }
     if subgroup_id:
         recipients["group"]["subGroups"] = [subgroup_id]
 
