@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "footballorganisertoolkit"
+version = "0.1.0"
+description = "CLI toolkit for managing football team availability in Spond"
+requires-python = ">=3.10"
+dependencies = [
+    "spond>=1.1.0",
+    "click>=8.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["footballorganisertoolkit*"]
+
+[project.scripts]
+fot = "footballorganisertoolkit.cli:cli"
