@@ -10,6 +10,12 @@ import click
 from .config import get_credentials, get_group_id, load_config, save_config
 from .spond_client import create_event, geocode, get_client, list_events, list_groups
 
+# Peyman + Christian as co-hosts on all events
+DEFAULT_OWNER_IDS = [
+    "34622EBE338D2C6D39960BA0ED32E231",  # Peyman Owladi
+    "67CCEE9213574F305B5B99A8B575C850",  # Christian Dam
+]
+
 HOME_DEFAULTS = {
     "time": "10:00",
     "duration": 75,
@@ -292,6 +298,7 @@ def create_cmd(heading, date, start_time, duration, description, location, meetu
                 location_data=location_data,
                 meetup_prior=meetup_prior,
                 subgroup_id=subgroup_id,
+                owner_ids=DEFAULT_OWNER_IDS,
             )
             click.echo(f"\n  Event created! ID: {result.get('id', '?')}")
         finally:
@@ -381,6 +388,7 @@ def batch_create(file, group_id, dry_run):
                     end=evt["end"],
                     description=evt["description"],
                     location=evt["location"],
+                    owner_ids=DEFAULT_OWNER_IDS,
                 )
                 click.echo(
                     f"  Created: {evt['heading']} -> ID: {result.get('id', '?')}"

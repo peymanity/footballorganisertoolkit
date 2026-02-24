@@ -113,6 +113,7 @@ async def create_event(
     location_data: dict[str, Any] | None = None,
     meetup_prior: int = 30,
     subgroup_id: str | None = None,
+    owner_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Create a new availability request in Spond.
 
@@ -122,6 +123,8 @@ async def create_event(
 
     location_data, if provided, takes precedence over location and should be
     a dict with keys like feature, address, latitude, longitude, postalCode, etc.
+
+    owner_ids, if provided, sets the event hosts/owners.
     """
     if not client.token:
         await client.login()
@@ -151,6 +154,9 @@ async def create_event(
         "type": "AVAILABILITY",
         "matchEvent": False,
     }
+
+    if owner_ids:
+        event_data["owners"] = [{"id": oid} for oid in owner_ids]
 
     if location_data:
         event_data["location"] = location_data
