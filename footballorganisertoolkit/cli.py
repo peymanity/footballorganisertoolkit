@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import click
 
 from .config import get_credentials, get_group_id, load_config, save_config
-from .spond_client import create_event, get_client, list_events, list_groups
+from .spond_client import create_event, geocode, get_client, list_events, list_groups
 
 HOME_DEFAULTS = {
     "time": "10:00",
@@ -230,12 +230,20 @@ def create_cmd(heading, date, start_time, duration, description, location, meetu
     else:
         final_description = default_desc
 
-    # Location: --home uses Rothamsted with lat/lng, explicit --location overrides
+    # Location: --home uses Rothamsted with lat/lng, explicit --location gets geocoded
     if home and location is None:
         location_data = defaults["location_data"]
         location_display = location_data["address"]
     elif location:
-        location_display = location
+        click.echo(f"  Geocoding '{location}'...")
+        location_data = _run(geocode(location))
+        if location_data:
+            location_display = location_data["address"]
+            click.echo(f"  Found: {location_display}")
+            click.echo(f"  Coords: {location_data['latitude']}, {location_data['longitude']}")
+        else:
+            click.echo(f"  Geocoding failed, using location string as-is.")
+            location_display = location
     else:
         location_display = None
 

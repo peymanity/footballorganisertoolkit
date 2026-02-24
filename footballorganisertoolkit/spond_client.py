@@ -6,7 +6,75 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any
 
+import aiohttp
 from spond.spond import Spond
+
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+
+
+async def geocode(query: str, country: str = "gb") -> dict[str, Any] | None:
+    """Geocode a location string using OpenStreetMap Nominatim.
+
+    Returns a dict with feature, address, latitude, longitude, and any
+    available address components matching the Spond location format.
+    Returns None if no results found.
+    """
+    params = {
+        "q": query,
+        "format": "jsonv2",
+        "addressdetails": "1",
+        "limit": "1",
+        "countrycodes": country,
+    }
+    headers = {"User-Agent": "footballorganisertoolkit/0.1.0"}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(NOMINATIM_URL, params=params, headers=headers) as r:
+            if not r.ok:
+                return None
+            results = await r.json()
+            if not results:
+                return None
+
+    result = results[0]
+    addr = result.get("address", {})
+
+    # Build a short address like "The Priory School, Bedford Road, Hitchin"
+    name = result.get("name") or query
+    road = addr.get("road", "")
+    town = (
+        addr.get("town")
+        or addr.get("city")
+        or addr.get("village")
+        or addr.get("suburb")
+        or ""
+    )
+    parts = [p for p in [name, road, town] if p and p != name or p == name]
+    # Deduplicate: name is always first, only add road/town if different
+    short_parts = [name]
+    if road and road != name:
+        short_parts.append(road)
+    if town and town != name and town != road:
+        short_parts.append(town)
+    short_address = ", ".join(short_parts)
+
+    location_data: dict[str, Any] = {
+        "feature": name,
+        "address": short_address,
+        "latitude": float(result["lat"]),
+        "longitude": float(result["lon"]),
+    }
+
+    if addr.get("postcode"):
+        location_data["postalCode"] = addr["postcode"]
+    if addr.get("country_code"):
+        location_data["country"] = addr["country_code"].upper()
+    if addr.get("state") or addr.get("region"):
+        location_data["administrativeAreaLevel1"] = addr.get("state") or addr.get("region")
+    if addr.get("county"):
+        location_data["administrativeAreaLevel2"] = addr["county"]
+
+    return location_data
 
 
 async def get_client(username: str, password: str) -> Spond:
