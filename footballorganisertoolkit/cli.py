@@ -31,8 +31,14 @@ HOME_DEFAULTS = {
 }
 
 AWAY_DEFAULTS = {
-    "duration": 75,
+    "time": "10:00",
+    "duration": 210,
     "meetup_prior": 30,
+    "heading_suffix": " - TIME AND DETAILS TBC",
+    "description": (
+        "Meeting/kickoff time and full details will be confirmed at least 3 days "
+        "before the match once notified by the home team."
+    ),
 }
 
 
@@ -194,7 +200,8 @@ def events(group_id, upcoming, max_events):
 def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, home, group_id, subgroup_id, yes, dry_run):
     """Create an availability request in Spond.
 
-    Use --home for home matches (sets Rothamsted Park, 10:00 KO, blue kit info).
+    Use --home for home matches (Rothamsted Park, 10:00 KO, 75 min, blue kit info).
+    Away matches default to 10:00-13:30 placeholder with TBC details.
     All defaults can be overridden with explicit flags.
     """
     gid = group_id or get_group_id()
@@ -210,14 +217,18 @@ def create_cmd(heading, date, start_time, duration, description, location, meetu
     if meetup_prior is None:
         meetup_prior = defaults.get("meetup_prior", 30)
 
+    # Apply heading suffix for away matches
+    if not home and "heading_suffix" in defaults and defaults["heading_suffix"] not in heading:
+        heading = heading + defaults["heading_suffix"]
+
     # Build description
-    if home and description is None:
-        final_description = defaults["description"]
-    elif home and description is not None:
-        # Prepend the home defaults, then append extra description
-        final_description = defaults["description"] + "\n\n" + description
+    default_desc = defaults.get("description", "")
+    if description is not None and default_desc:
+        final_description = default_desc + "\n\n" + description
+    elif description is not None:
+        final_description = description
     else:
-        final_description = description or ""
+        final_description = default_desc
 
     # Location: --home uses Rothamsted with lat/lng, explicit --location overrides
     if home and location is None:
