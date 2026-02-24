@@ -42,6 +42,7 @@ async def create_event(
     end: datetime,
     description: str = "",
     location: str | None = None,
+    location_data: dict[str, Any] | None = None,
     meetup_prior: int = 30,
     subgroup_id: str | None = None,
 ) -> dict[str, Any]:
@@ -50,6 +51,9 @@ async def create_event(
     Based on the structure of real events from the Harpenden Colts group.
     The spond package doesn't expose a create method, so we call the API
     directly using the authenticated session.
+
+    location_data, if provided, takes precedence over location and should be
+    a dict with keys like feature, address, latitude, longitude, postalCode, etc.
     """
     if not client.token:
         await client.login()
@@ -80,7 +84,9 @@ async def create_event(
         "matchEvent": False,
     }
 
-    if location:
+    if location_data:
+        event_data["location"] = location_data
+    elif location:
         event_data["location"] = {
             "feature": location,
             "address": location,

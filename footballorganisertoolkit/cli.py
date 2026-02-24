@@ -10,6 +10,31 @@ import click
 from .config import get_credentials, get_group_id, load_config, save_config
 from .spond_client import create_event, get_client, list_events, list_groups
 
+HOME_DEFAULTS = {
+    "time": "10:00",
+    "duration": 75,
+    "meetup_prior": 30,
+    "description": (
+        "BLUE (home) kit\n"
+        "\n"
+        "Rothamsted venue info: https://drive.google.com/file/d/1Z21E2VEupl3gc1yIs305VgQ9TXECRK70/view?usp=sharing"
+    ),
+    "location_data": {
+        "feature": "Rothamsted Park",
+        "address": "Rothamsted Park, Harpenden",
+        "latitude": 51.811954,
+        "longitude": -0.3605304,
+        "country": "GB",
+        "administrativeAreaLevel1": "England",
+        "administrativeAreaLevel2": "Hertfordshire",
+    },
+}
+
+AWAY_DEFAULTS = {
+    "duration": 75,
+    "meetup_prior": 30,
+}
+
 
 def _run(coro):
     """Run an async coroutine and ensure the client session is closed."""
@@ -156,22 +181,52 @@ def events(group_id, upcoming, max_events):
     type=click.DateTime(formats=["%Y-%m-%d"]),
     help="Event date (YYYY-MM-DD)",
 )
-@click.option("--time", "start_time", required=True, help="Kick-off time (HH:MM)")
-@click.option(
-    "--duration",
-    default=90,
-    help="Duration in minutes (default: 90)",
-)
-@click.option("--description", default="", help="Event description")
+@click.option("--time", "start_time", default=None, help="Kick-off time (HH:MM), default 10:00 for home")
+@click.option("--duration", default=None, type=int, help="Duration in minutes (default: 75)")
+@click.option("--description", default=None, help="Event description (appended to home/away defaults)")
 @click.option("--location", default=None, help="Venue / location")
-@click.option("--meetup-prior", default=30, help="Meetup time before kick-off in minutes (default: 30)")
+@click.option("--meetup-prior", default=None, type=int, help="Meetup time before kick-off in minutes (default: 30)")
+@click.option("--home", is_flag=True, help="Home match: Rothamsted Park, 10:00 KO, blue kit, venue info link")
 @click.option("--group-id", default=None, help="Group ID (uses default if not set)")
 @click.option("--subgroup-id", default=None, help="Subgroup ID")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
 @click.option("--dry-run", is_flag=True, help="Show what would be created without creating")
-def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, group_id, subgroup_id, yes, dry_run):
-    """Create an availability request in Spond."""
+def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, home, group_id, subgroup_id, yes, dry_run):
+    """Create an availability request in Spond.
+
+    Use --home for home matches (sets Rothamsted Park, 10:00 KO, blue kit info).
+    All defaults can be overridden with explicit flags.
+    """
     gid = group_id or get_group_id()
+
+    # Apply home/away defaults
+    defaults = HOME_DEFAULTS if home else AWAY_DEFAULTS
+    location_data = None
+
+    if start_time is None:
+        start_time = defaults.get("time", "10:00")
+    if duration is None:
+        duration = defaults.get("duration", 75)
+    if meetup_prior is None:
+        meetup_prior = defaults.get("meetup_prior", 30)
+
+    # Build description
+    if home and description is None:
+        final_description = defaults["description"]
+    elif home and description is not None:
+        # Prepend the home defaults, then append extra description
+        final_description = defaults["description"] + "\n\n" + description
+    else:
+        final_description = description or ""
+
+    # Location: --home uses Rothamsted with lat/lng, explicit --location overrides
+    if home and location is None:
+        location_data = defaults["location_data"]
+        location_display = location_data["address"]
+    elif location:
+        location_display = location
+    else:
+        location_display = None
 
     # Parse time
     try:
@@ -184,17 +239,16 @@ def create_cmd(heading, date, start_time, duration, description, location, meetu
     meetup = start - timedelta(minutes=meetup_prior)
 
     click.echo(f"\n  Event:    {heading}")
+    if home:
+        click.echo("  Type:     HOME")
     click.echo(f"  Date:     {start.strftime('%a %d %b %Y')}")
     click.echo(f"  Meetup:   {meetup.strftime('%H:%M')}")
     click.echo(f"  Kick-off: {start.strftime('%H:%M')} - {end.strftime('%H:%M')}")
     click.echo(f"  Duration: {duration} min")
-    if location:
-        click.echo(f"  Location: {location}")
-    if description:
-        click.echo(f"  Description: {description}")
-    click.echo(f"  Group:    {gid}")
-    if subgroup_id:
-        click.echo(f"  Subgroup: {subgroup_id}")
+    if location_display:
+        click.echo(f"  Location: {location_display}")
+    if final_description:
+        click.echo(f"  Description:\n    {final_description.replace(chr(10), chr(10) + '    ')}")
 
     if dry_run:
         click.echo("\n  [DRY RUN] Event not created.")
@@ -214,8 +268,9 @@ def create_cmd(heading, date, start_time, duration, description, location, meetu
                 heading=heading,
                 start=start,
                 end=end,
-                description=description,
-                location=location,
+                description=final_description,
+                location=location if not location_data else None,
+                location_data=location_data,
                 meetup_prior=meetup_prior,
                 subgroup_id=subgroup_id,
             )
