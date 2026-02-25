@@ -59,7 +59,7 @@ fot create \
   -y
 ```
 
-Locations are automatically geocoded via OpenStreetMap to get coordinates.
+Locations are automatically geocoded to get coordinates. Uses Google Maps if configured, otherwise falls back to OpenStreetMap Nominatim.
 
 ### Batch create from CSV
 
@@ -90,6 +90,31 @@ When using this repo with [Claude Code](https://claude.ai/claude-code), the `/up
 ```
 /update-match <paste email content here>
 ```
+
+## Configuration
+
+After initial setup with `fot config`, you can set individual config values:
+
+```bash
+fot config-set <key> <value>
+```
+
+| Key                    | Description                                     |
+|------------------------|-------------------------------------------------|
+| `google_maps_api_key`  | Google Maps Geocoding API key (recommended)     |
+| `group_id`             | Default Spond group ID                          |
+| `group_name`           | Default Spond group name (display only)         |
+
+### Google Maps geocoding
+
+For reliable venue geocoding (especially grassroots playing fields), set up a Google Maps API key:
+
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable the **Geocoding API**
+3. Create an API key under **Credentials**
+4. `fot config-set google_maps_api_key AIza...`
+
+The free tier ($200/month credit) covers ~40,000 requests. Without a key, Nominatim is used as a fallback but struggles with smaller venues.
 
 ## Options reference
 

@@ -8,6 +8,13 @@ from pathlib import Path
 CONFIG_DIR = Path.home() / ".config" / "footballorganisertoolkit"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
+# Keys that can be set via `fot config-set`
+CONFIGURABLE_KEYS = {
+    "google_maps_api_key": "Google Maps Geocoding API key (for venue geocoding)",
+    "group_id": "Default Spond group ID",
+    "group_name": "Default Spond group name (display only)",
+}
+
 
 def load_config() -> dict:
     if not CONFIG_FILE.exists():

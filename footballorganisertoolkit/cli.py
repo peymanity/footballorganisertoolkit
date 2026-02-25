@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import click
 
-from .config import get_credentials, get_group_id, load_config, save_config
+from .config import CONFIGURABLE_KEYS, get_credentials, get_group_id, load_config, save_config
 from .spond_client import create_event, geocode, get_client, list_events, list_groups
 
 # Peyman + Christian as co-hosts on all events
@@ -118,10 +118,17 @@ def config(username, password):
 
 
 @cli.command("config-set")
-@click.argument("key")
+@click.argument("key", type=click.Choice(list(CONFIGURABLE_KEYS.keys()), case_sensitive=False))
 @click.argument("value")
 def config_set(key, value):
-    """Set a single config value. e.g. fot config-set google_maps_api_key AIza..."""
+    """Set a config value.
+
+    \b
+    Available keys:
+      google_maps_api_key  Google Maps Geocoding API key
+      group_id             Default Spond group ID
+      group_name           Default Spond group name
+    """
     cfg = load_config()
     cfg[key] = value
     save_config(cfg)
