@@ -117,6 +117,17 @@ def config(username, password):
     click.echo(f"Default group set to: {selected['name']}")
 
 
+@cli.command("config-set")
+@click.argument("key")
+@click.argument("value")
+def config_set(key, value):
+    """Set a single config value. e.g. fot config-set google_maps_api_key AIza..."""
+    cfg = load_config()
+    cfg[key] = value
+    save_config(cfg)
+    click.echo(f"Set {key}.")
+
+
 @cli.command()
 def groups():
     """List your Spond groups and their IDs."""

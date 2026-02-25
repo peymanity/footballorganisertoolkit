@@ -10,15 +10,66 @@ import aiohttp
 from spond.spond import Spond
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 
-async def geocode(query: str, country: str = "gb") -> dict[str, Any] | None:
-    """Geocode a location string using OpenStreetMap Nominatim.
+async def _geocode_google(
+    query: str, api_key: str, country: str = "gb"
+) -> dict[str, Any] | None:
+    """Geocode using Google Maps Geocoding API."""
+    params = {
+        "address": query,
+        "key": api_key,
+        "region": country,
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(GOOGLE_GEOCODE_URL, params=params) as r:
+            if not r.ok:
+                return None
+            data = await r.json()
+            if data.get("status") != "OK" or not data.get("results"):
+                return None
 
-    Returns a dict with feature, address, latitude, longitude, and any
-    available address components matching the Spond location format.
-    Returns None if no results found.
-    """
+    result = data["results"][0]
+    geo = result["geometry"]["location"]
+    addr_components = {
+        c["types"][0]: c
+        for c in result.get("address_components", [])
+        if c.get("types")
+    }
+
+    # Use the first part of the formatted address as the feature name,
+    # or fall back to the query
+    formatted = result.get("formatted_address", query)
+    name = result.get("name") or formatted.split(",")[0].strip()
+
+    location_data: dict[str, Any] = {
+        "feature": name,
+        "address": formatted,
+        "latitude": geo["lat"],
+        "longitude": geo["lng"],
+    }
+
+    if "postal_code" in addr_components:
+        location_data["postalCode"] = addr_components["postal_code"]["long_name"]
+    if "country" in addr_components:
+        location_data["country"] = addr_components["country"]["short_name"]
+    if "administrative_area_level_1" in addr_components:
+        location_data["administrativeAreaLevel1"] = addr_components[
+            "administrative_area_level_1"
+        ]["long_name"]
+    if "administrative_area_level_2" in addr_components:
+        location_data["administrativeAreaLevel2"] = addr_components[
+            "administrative_area_level_2"
+        ]["long_name"]
+
+    return location_data
+
+
+async def _geocode_nominatim(
+    query: str, country: str = "gb"
+) -> dict[str, Any] | None:
+    """Geocode using OpenStreetMap Nominatim (no API key needed)."""
     params = {
         "q": query,
         "format": "jsonv2",
@@ -39,7 +90,6 @@ async def geocode(query: str, country: str = "gb") -> dict[str, Any] | None:
     result = results[0]
     addr = result.get("address", {})
 
-    # Build a short address like "The Priory School, Bedford Road, Hitchin"
     name = result.get("name") or query
     road = addr.get("road", "")
     town = (
@@ -49,8 +99,6 @@ async def geocode(query: str, country: str = "gb") -> dict[str, Any] | None:
         or addr.get("suburb")
         or ""
     )
-    parts = [p for p in [name, road, town] if p and p != name or p == name]
-    # Deduplicate: name is always first, only add road/town if different
     short_parts = [name]
     if road and road != name:
         short_parts.append(road)
@@ -70,11 +118,24 @@ async def geocode(query: str, country: str = "gb") -> dict[str, Any] | None:
     if addr.get("country_code"):
         location_data["country"] = addr["country_code"].upper()
     if addr.get("state") or addr.get("region"):
-        location_data["administrativeAreaLevel1"] = addr.get("state") or addr.get("region")
+        location_data["administrativeAreaLevel1"] = (
+            addr.get("state") or addr.get("region")
+        )
     if addr.get("county"):
         location_data["administrativeAreaLevel2"] = addr["county"]
 
     return location_data
+
+
+async def geocode(query: str, country: str = "gb") -> dict[str, Any] | None:
+    """Geocode a location string. Uses Google Maps if an API key is configured,
+    otherwise falls back to OpenStreetMap Nominatim."""
+    from .config import load_config
+
+    api_key = load_config().get("google_maps_api_key")
+    if api_key:
+        return await _geocode_google(query, api_key, country)
+    return await _geocode_nominatim(query, country)
 
 
 async def get_client(username: str, password: str) -> Spond:
