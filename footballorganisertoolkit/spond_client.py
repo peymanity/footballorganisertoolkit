@@ -38,13 +38,10 @@ async def _geocode_google(
         if c.get("types")
     }
 
-    # Use the first part of the formatted address as the feature name,
-    # or fall back to the query
     formatted = result.get("formatted_address", query)
-    name = result.get("name") or formatted.split(",")[0].strip()
 
     location_data: dict[str, Any] = {
-        "feature": name,
+        "feature": query,
         "address": formatted,
         "latitude": geo["lat"],
         "longitude": geo["lng"],
@@ -107,7 +104,7 @@ async def _geocode_nominatim(
     short_address = ", ".join(short_parts)
 
     location_data: dict[str, Any] = {
-        "feature": name,
+        "feature": query,
         "address": short_address,
         "latitude": float(result["lat"]),
         "longitude": float(result["lon"]),
