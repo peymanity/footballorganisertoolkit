@@ -199,32 +199,40 @@ def events(group_id, upcoming, max_events):
 @click.option("--location", default=None, help="Venue / location")
 @click.option("--meetup-prior", default=None, type=int, help="Meetup time before kick-off in minutes (default: 30)")
 @click.option("--home", is_flag=True, help="Home match: Rothamsted Park, 10:00 KO, blue kit, venue info link")
+@click.option("--away", is_flag=True, help="Away match: 10:00-13:30 block, TBC heading/description")
 @click.option("--group-id", default=None, help="Group ID (uses default if not set)")
 @click.option("--subgroup-id", default=None, help="Subgroup ID")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompt")
 @click.option("--dry-run", is_flag=True, help="Show what would be created without creating")
-def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, home, group_id, subgroup_id, yes, dry_run):
+def create_cmd(heading, date, start_time, duration, description, location, meetup_prior, home, away, group_id, subgroup_id, yes, dry_run):
     """Create an availability request in Spond.
 
     Use --home for home matches (Rothamsted Park, 10:00 KO, 75 min, blue kit info).
-    Away matches default to 10:00-13:30 placeholder with TBC details.
+    Use --away for away matches (10:00-13:30 block, TBC heading/description).
     All defaults can be overridden with explicit flags.
     """
+    if home and away:
+        raise click.UsageError("Cannot use both --home and --away.")
     gid = group_id or get_group_id()
 
     # Apply home/away defaults
-    defaults = HOME_DEFAULTS if home else AWAY_DEFAULTS
+    if home:
+        defaults = HOME_DEFAULTS
+    elif away:
+        defaults = AWAY_DEFAULTS
+    else:
+        defaults = {}
     location_data = None
 
     if start_time is None:
-        start_time = defaults.get("time", "10:00")
+        start_time = defaults.get("time") or "10:00"
     if duration is None:
-        duration = defaults.get("duration", 75)
+        duration = defaults.get("duration") or 75
     if meetup_prior is None:
-        meetup_prior = defaults.get("meetup_prior", 30)
+        meetup_prior = defaults.get("meetup_prior") or 30
 
     # Apply heading suffix for away matches
-    if not home and "heading_suffix" in defaults and defaults["heading_suffix"] not in heading:
+    if away and "heading_suffix" in defaults and defaults["heading_suffix"] not in heading:
         heading = heading + defaults["heading_suffix"]
 
     # Build description
@@ -264,8 +272,8 @@ def create_cmd(heading, date, start_time, duration, description, location, meetu
     meetup = start - timedelta(minutes=meetup_prior)
 
     click.echo(f"\n  Event:    {heading}")
-    if home:
-        click.echo("  Type:     HOME")
+    if home or away:
+        click.echo(f"  Type:     {'HOME' if home else 'AWAY'}")
     click.echo(f"  Date:     {start.strftime('%a %d %b %Y')}")
     click.echo(f"  Meetup:   {meetup.strftime('%H:%M')}")
     click.echo(f"  Kick-off: {start.strftime('%H:%M')} - {end.strftime('%H:%M')}")
